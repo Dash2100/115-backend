@@ -20,6 +20,8 @@ def _load_dotenv(env_path: Path) -> None:
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
+        if line.startswith("export "):
+            line = line[len("export "):].strip()
         key, value = line.split("=", 1)
         key = key.strip()
         value = value.strip()
@@ -64,8 +66,8 @@ def call_model(messages: list[dict[str, str]]) -> dict:
 
     if resp.ok:
         choices = data.get("choices") or []
-        content = choices[0].get("message", {}).get("content") if choices else None
-        print("reply:", content)
+        message = (choices[0].get("message") or {}) if choices else {}
+        print("reply:", message.get("content"))
     else:
         print("error:", data.get("error", data))
 

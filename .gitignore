@@ -1,3 +1,18 @@
+# Secrets & local environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# OS
+.DS_Store
+
 ### AL ###
 #Template for AL projects for Dynamics 365 Business Central
 #launch.json folder

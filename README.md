@@ -6,14 +6,10 @@ Agent Runtime 課程實作練習（[教材連結](https://gloomcheng.github.io/1
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env  # 填入 NVIDIA_API_KEY（.env 已忽略，不會提交）
-```
-
-或直接在終端機設定環境變數：
-
-```bash
 export NVIDIA_API_KEY=your_api_key
 ```
+
+也可建立本地 `.env` 填入 `NVIDIA_API_KEY=...`（`.env` 已在 `.gitignore` 中忽略，不會提交）。
 
 ## Week 1：`week1_single_call.py`
 

@@ -1,5 +1,6 @@
 """Week 1: Single Chat Completions API call using NVIDIA's OpenAI-compatible endpoint."""
 
+import argparse
 import json
 import os
 from pathlib import Path
@@ -16,7 +17,7 @@ def _load_dotenv(env_path: Path) -> None:
     """Populate os.environ from a local .env file without overriding existing variables."""
     if not env_path.is_file():
         return
-    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+    for raw_line in env_path.read_text(encoding="utf-8-sig").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
@@ -31,14 +32,25 @@ def _load_dotenv(env_path: Path) -> None:
             os.environ[key] = value
 
 
-def call_model(messages: list[dict[str, str]]) -> dict:
+def _load_env_files() -> None:
+    """Load .env from the script directory and current working directory."""
+    script_env = Path(__file__).resolve().with_name(".env")
+    cwd_env = Path.cwd() / ".env"
+    _load_dotenv(script_env)
+    if cwd_env.resolve() != script_env:
+        _load_dotenv(cwd_env)
+
+
+def call_model(messages: list[dict[str, str]], model: str | None = None) -> dict:
     """Send a single Chat Completions request and print status, JSON body, and reply/error."""
-    _load_dotenv(Path(__file__).resolve().with_name(".env"))
+    _load_env_files()
     api_key = os.environ.get("NVIDIA_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError(
             "Missing NVIDIA_API_KEY. Export it in your shell or set it in a local .env file."
         )
+
+    selected_model = (model or os.environ.get("NVIDIA_MODEL", "")).strip() or MODEL
 
     resp = requests.post(
         API_URL,
@@ -47,7 +59,7 @@ def call_model(messages: list[dict[str, str]]) -> dict:
             "Content-Type": "application/json",
         },
         json={
-            "model": MODEL,
+            "model": selected_model,
             "messages": messages,
             "max_tokens": 512,
             "temperature": 1,
@@ -65,19 +77,44 @@ def call_model(messages: list[dict[str, str]]) -> dict:
     print(json.dumps(data, ensure_ascii=False, indent=2))
 
     if resp.ok:
-        choices = data.get("choices") or []
-        message = (choices[0].get("message") or {}) if choices else {}
-        print("reply:", message.get("content"))
+        choices = data.get("choices") if isinstance(data, dict) else None
+        first_choice = choices[0] if isinstance(choices, list) and choices else None
+        message = first_choice.get("message") if isinstance(first_choice, dict) else None
+        content = message.get("content") if isinstance(message, dict) else None
+        print("reply:", content)
+
+        usage = data.get("usage") if isinstance(data, dict) else None
+        if isinstance(usage, dict):
+            print("usage:", json.dumps(usage, ensure_ascii=False))
     else:
-        print("error:", data.get("error", data))
+        error = data.get("error", data) if isinstance(data, dict) else data
+        print("error:", error)
 
     return data
 
 
+def _parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Send a single Chat Completions API request to NVIDIA's endpoint."
+    )
+    parser.add_argument(
+        "prompt",
+        nargs="*",
+        help=f"User prompt text (default: {DEFAULT_PROMPT})",
+    )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help=f"Model ID override (default: NVIDIA_MODEL env var or {MODEL})",
+    )
+    return parser.parse_args(argv)
+
+
 if __name__ == "__main__":
-    prompt = " ".join(sys.argv[1:]).strip() or DEFAULT_PROMPT
+    args = _parse_args(sys.argv[1:])
+    prompt = " ".join(args.prompt).strip() or DEFAULT_PROMPT
     try:
-        call_model([{"role": "user", "content": prompt}])
+        call_model([{"role": "user", "content": prompt}], model=args.model)
     except (RuntimeError, requests.RequestException) as exc:
         print(f"request failed: {exc}", file=sys.stderr)
         sys.exit(1)
